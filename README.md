@@ -2,19 +2,14 @@
 
 A terminal UI for exploring SQLite databases.
 
-`sqlens` opens databases in read-only mode.
-
-## Installation
-
-```bash
+```console
 uv install
-```
-
-## Usage
-
-```bash
 uv run sqlens path/to/database.sqlite
 ```
+
+![sqlens screenshot](docs/assets/screenshot-1.png)
+
+`sqlens` opens databases in read-only mode.
 
 ## Interface
 

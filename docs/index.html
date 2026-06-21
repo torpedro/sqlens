@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="sqlens is a terminal UI for exploring SQLite databases.">
+  <title>sqlens - SQLite terminal explorer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111318;
+      --panel: #191d24;
+      --text: #f2f5f8;
+      --muted: #a8b0bd;
+      --line: #343b48;
+      --accent: #6ee7b7;
+      --accent-strong: #34d399;
+      --code: #0b0d11;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+      text-decoration-color: color-mix(in srgb, var(--accent), transparent 35%);
+      text-underline-offset: 0.18em;
+    }
+
+    .shell {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 34px;
+      align-items: start;
+      min-height: 100vh;
+      padding: 54px 0 38px;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--accent);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(3.2rem, 8vw, 6.2rem);
+      line-height: 0.92;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 39rem;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: clamp(1.06rem, 2vw, 1.22rem);
+    }
+
+    .hero-terminal {
+      margin-top: 26px;
+      min-height: 0;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 30px;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .button.primary {
+      border-color: color-mix(in srgb, var(--accent-strong), black 22%);
+      background: var(--accent-strong);
+      color: #05110d;
+    }
+
+    .terminal-shot {
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 0.36);
+      overflow: hidden;
+    }
+
+    .terminal-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    pre {
+      margin: 0;
+      min-height: 72px;
+      overflow-x: auto;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--code);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    @media (max-width: 860px) {
+      .hero {
+        min-height: auto;
+        padding-top: 44px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell hero">
+    <div class="hero-copy">
+      <p class="eyebrow">SQLite terminal explorer</p>
+      <h1>sqlens</h1>
+      <p class="lead">
+        Browse SQLite tables and views from your terminal with sortable columns,
+        LIKE filters, row detail, JSON cell rendering, and custom SQL expressions.
+      </p>
+      <pre class="hero-terminal"><code>uv install
+uv run sqlens path/to/database.sqlite</code></pre>
+      <div class="actions">
+        <a class="button primary" href="https://github.com/torpedro/sqlens">View source</a>
+      </div>
+    </div>
+    <figure class="terminal-shot">
+      <img src="assets/screenshot-1.png" alt="sqlens terminal interface showing a SQLite table browser">
+    </figure>
+  </div>
+</body>
+</html>
