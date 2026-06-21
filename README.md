@@ -2,6 +2,8 @@
 
 A terminal UI for exploring SQLite databases.
 
+`sqlens` opens databases in read-only mode.
+
 ## Installation
 
 ```bash
