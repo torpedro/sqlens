@@ -1,0 +1,140 @@
+/* ── Cell detail screen ───────────────────────────────────────────────────── */
+
+CellDetailScreen {
+    align: center middle;
+}
+
+#cell-detail-col {
+    width: 80%;
+    padding: 1 2;
+    color: $accent;
+    text-style: bold;
+}
+
+#cell-detail-value {
+    width: 80%;
+    height: auto;
+    max-height: 80%;
+    padding: 1 2;
+    border: solid $primary;
+    background: $surface;
+}
+
+/* ── Layout ───────────────────────────────────────────────────────────────── */
+
+MainScreen > Horizontal {
+    height: 1fr;
+}
+
+/* ── Left pane ────────────────────────────────────────────────────────────── */
+
+#left-pane {
+    width: 30;
+    border-right: solid $primary;
+    background: $surface;
+}
+
+#table-list {
+    height: 1fr;
+    background: $surface;
+}
+
+/* ── Expression input bar ─────────────────────────────────────────────────── */
+
+#expr-bar {
+    dock: bottom;
+    height: 3;
+    background: $surface;
+    border-top: solid $accent;
+    display: none;
+}
+
+#expr-prefix {
+    width: 2;
+    padding: 1 0 0 1;
+    color: $accent;
+    text-style: bold;
+}
+
+#expr-input {
+    width: 1fr;
+    border: none;
+    background: $surface;
+}
+
+#like-bar {
+    dock: bottom;
+    height: 3;
+    background: $surface;
+    border-top: solid $accent;
+    display: none;
+}
+
+#like-prefix {
+    width: auto;
+    padding: 1 1 0 1;
+    color: $accent;
+    text-style: bold;
+}
+
+#like-input {
+    width: 1fr;
+    border: none;
+    background: $surface;
+}
+
+/* ── Right pane (data explorer) ───────────────────────────────────────────── */
+
+#right-pane {
+    width: 1fr;
+}
+
+#schema-table {
+    height: auto;
+    max-height: 12;
+    border-bottom: solid $primary;
+}
+
+#error-label {
+    height: 1;
+    padding: 0 1;
+    color: $error;
+}
+
+#data-table {
+    height: 1fr;
+}
+
+#detail-divider {
+    height: 1;
+    background: $primary-darken-2;
+    color: $text-muted;
+    padding: 0 1;
+}
+
+#detail-table {
+    height: auto;
+    max-height: 10;
+}
+
+#status-bar {
+    height: 1;
+    background: $primary;
+    color: $background;
+    padding: 0 1;
+}
+
+#help-bar {
+    dock: bottom;
+    height: 1;
+    background: $panel;
+    color: $text-muted;
+    padding: 0 1;
+}
+
+#query-bar {
+    height: auto;
+    background: $surface-darken-1;
+    color: $text-muted;
+    padding: 0 1;
+}
