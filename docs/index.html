@@ -157,15 +157,18 @@
       <p class="lead">
         Browse SQLite tables and views from your terminal with sortable columns,
         LIKE filters, row detail, JSON cell rendering, and custom SQL expressions.
+        Built in Rust with Ratatui. Databases are opened read-only.
       </p>
-      <pre class="hero-terminal"><code>uv install
-uv run sqlens path/to/database.sqlite</code></pre>
+      <pre class="hero-terminal"><code># From a checkout (Rust 1.88+ and a C compiler)
+cargo install --path . --locked
+sqlens path/to/database.sqlite</code></pre>
       <div class="actions">
         <a class="button primary" href="https://github.com/torpedro/sqlens">View source</a>
       </div>
     </div>
     <figure class="terminal-shot">
-      <img src="assets/screenshot-1.png" alt="sqlens terminal interface showing a SQLite table browser">
+      <img src="assets/screenshot-1.png" alt="Original SQLens prototype showing the SQLite browser layout">
+      <figcaption>Original prototype layout. SQLens is now implemented in Rust with Ratatui.</figcaption>
     </figure>
   </div>
 </body>

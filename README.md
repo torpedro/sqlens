@@ -1,66 +1,128 @@
 # sqlens
 
-A terminal UI for exploring SQLite databases.
+A read-only SQLite database explorer for the terminal, built in Rust with
+[Ratatui](https://ratatui.rs/). Browse tables and views, sort and filter columns,
+add SQL expressions, and inspect full cell values with JSON highlighting.
+
+## Install and run
+
+From this repository, with Rust 1.88+ and a C compiler installed:
 
 ```console
-uv install
-uv run sqlens path/to/database.sqlite
+cargo install --path . --locked
+sqlens path/to/database.sqlite
 ```
 
-![sqlens screenshot](docs/assets/screenshot-1.png)
+Or run directly from the checkout:
 
-`sqlens` opens databases in read-only mode.
+```console
+cargo run --locked --release -- path/to/database.sqlite
+```
+
+SQLite is bundled into the executable; Python and a system SQLite installation
+are not needed. The binary is also available at `target/release/sqlens` after
+`cargo build --locked --release`. Build separately for each operating system and
+architecture you distribute to.
+
+SQLens opens existing databases with SQLite's read-only flag and enables
+`query_only`. Database queries run on a dedicated worker thread. Switching tables
+supersedes and interrupts old queries; quitting also interrupts database work.
 
 ## Interface
 
-The screen is split into two panes:
-
-- **Left** — table/view list. Navigate with `↑`/`↓`, press `Enter` to focus the data table.
-- **Right** — schema, data table, row detail, and query bar.
-
-### Data table hotkeys
-
-| Key | Action |
-|-----|--------|
-| `s` / `S` | Sort focused column ASC / DESC (press again to clear) |
-| `f` | LIKE filter on focused column (`%text%`) |
-| `C` | Reset all filters and sort |
-| `c` | Copy focused cell value to clipboard |
-| `1`–`9`, `0` | Toggle visibility of columns 1–10 |
-| `+` | Add a custom SQL SELECT expression as an extra column |
-| `a`–`z` | Remove custom expression (when expressions exist) |
-| `Enter` | Open full cell detail view |
-| `PgDn` / `PgUp` | Next / previous page (50 rows per page) |
-| `Esc` / `Backspace` | Return focus to table list |
-| `Ctrl+Q` / `Ctrl+C` | Quit |
-
-### Column indicators
-
-- `●` — visible column
-- `○` — hidden column
-- `⊘` — active LIKE filter on this column
-- `▲` / `▼` — current sort column and direction
-
-### Cell detail view
-
-Press `Enter` on any cell to open a full-screen detail view. JSON values are automatically detected and rendered with syntax highlighting.
+The left pane lists tables and views. The right pane contains the schema, data
+grid, selected row detail, and generated SQL with its bound filter parameters.
+Arrow keys move the selection; the grid scrolls horizontally to keep the selected
+column visible. Click tables, cells, or headers with the mouse; the wheel navigates.
+Small terminals use a compact layout; at least 40 columns × 12 rows are required.
 
 | Key | Action |
-|-----|--------|
-| `Ctrl+←` / `Ctrl+→` | Previous / next column (same row) |
-| `Ctrl+↑` / `Ctrl+↓` | Previous / next row (same column) |
-| `c` | Copy value to clipboard |
-| `Esc` / `Backspace` | Back to table |
+| --- | --- |
+| `Tab` | Switch between table list and grid |
+| `↑` / `↓` | Navigate tables or rows |
+| `←` / `→` | Navigate columns in the grid |
+| `Enter` | Focus the grid / open full cell detail |
+| `s` / `S` | Sort selected column ascending / descending; repeat to clear |
+| `f` | Edit selected column's LIKE filter |
+| `C` | Clear all filters and sort |
+| `1`–`9`, `0` | Toggle base columns 1–10 |
+| `v` | Open a selector for all base columns; `Space` toggles visibility |
+| `+` | Add a SELECT expression |
+| `Delete` | Remove selected expression, including its filter and sort |
+| `c` | Copy the raw selected value |
+| `PgDn` / `PgUp` | Next / previous page, 50 rows per page |
+| `Home` / `End` | First / last row on the page, or first / last table |
+| `r` | Reload current table data |
+| `Esc` / `Backspace` | Return to table list; cancel a loading query from the grid |
+| `?` | Show keyboard help |
+| `Ctrl+Q` / `Ctrl+C` | Quit from any screen or input |
 
-### LIKE filter
+Grid actions apply while the grid has focus. At least one base column remains
+visible. Generated columns are included in the schema; internal hidden columns of
+virtual tables are omitted.
 
-Press `f` on a focused cell to open a filter input for that column. Entering text filters rows where `column LIKE '%text%'`. Submit empty to clear the filter for that column. Active filters are AND-ed together.
+### Filters and expressions
 
-### Custom expressions
+Filters use `column LIKE '%text%'` with bound parameters. Multiple filters are
+AND-ed together. `%` and `_` retain SQLite's LIKE wildcard behavior. Submit empty
+text to clear a filter; spaces are preserved. Hidden columns can retain filters.
 
-Press `+` to add a SQL SELECT expression as an extra column (e.g. `UPPER(name) AS upper_name`, `json_extract(data, '$.id') AS id`). Press the assigned letter key (`a`, `b`, …) to remove it.
+Expressions must produce one column. An explicit `AS` alias is optional:
 
-## Requirements
+```sql
+UPPER(name) AS upper_name
+json_extract(data, '$.id') AS json_id
+CAST(price AS REAL) * quantity AS total
+```
 
-- Python 3.10+
-- [Textual](https://github.com/Textualize/textual) 8.2.7+
+SQLite validates expressions and decodes aliases. Duplicate labels are rejected
+case-insensitively. Filters are applied to projected expression values, preserving
+operator precedence. Aggregate expressions such as `COUNT(*)` follow SQLite's
+semantics and can collapse the result to one row; counts reflect that result.
+
+Inputs support Unicode typing, bracketed paste, arrows, Home/End, Delete,
+Backspace, and `Ctrl+U` to clear. `Enter` submits and `Esc` cancels.
+
+### Cell detail and clipboard
+
+Full cell detail preserves literal text and pretty-prints JSON with syntax colors.
+Arrow keys scroll, PgUp/PgDn scroll vertically, and `Ctrl+←/→/↑/↓` navigate adjacent
+cells on the current page. `Esc` returns to the grid. BLOBs show their byte count
+in the grid and hexadecimal SQL literals in detail. NULL is displayed and copied
+as `NULL`.
+
+Clipboard copying uses the terminal's OSC 52 protocol, including over SSH when
+supported. Your terminal must permit clipboard writes. SQLens reports that it
+sent the copy request; the protocol does not confirm that the clipboard changed.
+
+### Query behavior
+
+Counts are cached across paging, sorting, and visibility changes, and invalidated
+when the query source, filters, or SQLite data version changes. Exact counts and
+deep OFFSET pages may still take time on large databases. Navigation and quitting
+remain responsive while SQL executes.
+
+Without an explicit sort, row order follows SQLite's query plan. Duplicate sort
+values and databases modified by other processes can produce changing page
+boundaries. `r` refreshes rows; reopen SQLens to refresh the table list.
+
+## Development
+
+```console
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked
+```
+
+- `src/main.rs`: CLI, terminal lifecycle, events, clipboard.
+- `src/app.rs`: application state, keyboard commands, input editing.
+- `src/db.rs`: read-only SQLite access, query construction, cancellable worker.
+- `src/ui.rs`: Ratatui rendering, JSON highlighting, mouse hit testing.
+
+Tests use temporary/in-memory databases and Ratatui's headless backend. They cover
+read-only enforcement, generated columns, expressions, filters, paging, worker
+requests, keyboard state, Unicode input, and rendering at different terminal sizes.
+
+The Python/Textual implementation was replaced in version 0.2.0 and remains
+available in Git history. The original prototype screenshot is retained in
+`docs/assets/screenshot-1.png` as a layout reference.
