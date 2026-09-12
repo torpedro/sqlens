@@ -550,7 +550,14 @@ mod tests {
     #[test]
     fn readonly_and_quoted_identifiers() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("data?#.sqlite");
+        // Windows forbids '?' in filenames. Keep spaces and '#' coverage there,
+        // and exercise literal '?' handling on platforms that support it.
+        let filename = if cfg!(windows) {
+            "data #.sqlite"
+        } else {
+            "data ?#.sqlite"
+        };
+        let path = dir.path().join(filename);
         let conn = Connection::open(&path).unwrap();
         conn.execute_batch("CREATE TABLE \"a\"\"b\" (\"x\"\"y\" TEXT); INSERT INTO \"a\"\"b\" VALUES ('[bold]literal[/bold]');").unwrap();
         drop(conn);
