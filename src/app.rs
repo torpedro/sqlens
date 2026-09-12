@@ -395,6 +395,7 @@ impl App {
         match key.code {
             KeyCode::Up => self.move_cell(-1, 0),
             KeyCode::Down => self.move_cell(1, 0),
+            KeyCode::Left if self.col == 0 => self.focus = Focus::Tables,
             KeyCode::Left => self.move_cell(0, -1),
             KeyCode::Right => self.move_cell(0, 1),
             KeyCode::Home => self.row = 0,

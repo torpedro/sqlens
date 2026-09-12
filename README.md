@@ -40,7 +40,7 @@ Small terminals use a compact layout; at least 40 columns × 12 rows are require
 | --- | --- |
 | `Tab` | Switch between table list and grid |
 | `↑` / `↓` | Navigate tables or rows |
-| `←` / `→` | Navigate columns in the grid |
+| `←` / `→` | Navigate columns; Left from the first visible column returns to the table list |
 | `Enter` | Focus the grid / open full cell detail |
 | `s` / `S` | Sort selected column ascending / descending; repeat to clear |
 | `f` | Edit selected column's LIKE filter |
