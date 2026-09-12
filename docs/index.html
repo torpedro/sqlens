@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="sqlens is a terminal UI for exploring SQLite databases.">
+  <meta name="description" content="Explore SQLite databases with SQLens, a read-only terminal browser built in Rust with Ratatui. Installation, keyboard shortcuts, filters, and SQL expressions.">
   <title>sqlens - SQLite terminal explorer</title>
   <style>
     :root {
@@ -46,7 +46,6 @@
       grid-template-columns: 1fr;
       gap: 34px;
       align-items: start;
-      min-height: 100vh;
       padding: 54px 0 38px;
     }
 
@@ -119,11 +118,8 @@
       overflow: hidden;
     }
 
-    .terminal-shot img {
-      display: block;
-      width: 100%;
-      height: auto;
-    }
+    .terminal-shot img { display: block; width: 100%; height: auto; }
+    .terminal-shot figcaption { padding: 12px 18px; color: var(--muted); font-size: 0.9rem; }
 
     pre {
       margin: 0;
@@ -141,35 +137,206 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
+    html { scroll-padding-top: 24px; }
+    a:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 5px;
+    }
+    .skip-link { position: absolute; top: -100px; left: 16px; padding: 10px; background: var(--panel); }
+    .skip-link:focus { top: 10px; }
+    .nav { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 24px 0; border-bottom: 1px solid var(--line); }
+    .nav a { text-decoration: none; color: var(--muted); }
+    .nav a:hover { color: var(--accent); }
+    section { padding: 38px 0; border-top: 1px solid var(--line); scroll-margin-top: 20px; }
+    h2 { margin: 0 0 18px; font-size: 1.8rem; letter-spacing: -0.03em; }
+    h3 { margin: 24px 0 10px; font-size: 1.1rem; }
+    p { max-width: 78ch; }
+    .muted, .note { color: var(--muted); }
+    .columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+    .columns > div { min-width: 0; }
+    .columns h3:first-child { margin-top: 0; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    caption { text-align: left; color: var(--muted); padding-bottom: 16px; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--accent); font-weight: 600; }
+    td:first-child { width: 28%; }
+    kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; padding: 2px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); white-space: nowrap; }
+    .steps { padding-left: 24px; }
+    .steps li { margin-bottom: 12px; }
+    details { padding: 16px 0; border-bottom: 1px solid var(--line); }
+    summary { cursor: pointer; font-weight: 600; }
+    footer { display: flex; flex-wrap: wrap; gap: 12px 24px; padding: 28px 0 48px; color: var(--muted); }
+
     @media (max-width: 860px) {
       .hero {
-        min-height: auto;
         padding-top: 44px;
       }
+      .columns { grid-template-columns: 1fr; gap: 24px; }
+      th, td { padding: 10px 8px; }
+      td:first-child { width: 35%; }
     }
   </style>
 </head>
 <body>
-  <div class="shell hero">
+  <a class="skip-link" href="#main">Skip to content</a>
+  <nav class="shell nav" aria-label="Documentation">
+    <a href="#install">Install</a>
+    <a href="#browse">Browse</a>
+    <a href="#shortcuts">Keyboard shortcuts</a>
+    <a href="#expressions">Filters &amp; expressions</a>
+    <a href="#details">Cell detail</a>
+  </nav>
+  <main id="main" class="shell">
+  <header class="hero">
     <div class="hero-copy">
-      <p class="eyebrow">SQLite terminal explorer</p>
+      <p class="eyebrow">SQLite terminal explorer · Rust + Ratatui</p>
       <h1>sqlens</h1>
       <p class="lead">
-        Browse SQLite tables and views from your terminal with sortable columns,
-        LIKE filters, row detail, JSON cell rendering, and custom SQL expressions.
-        Built in Rust with Ratatui. Databases are opened read-only.
+        A closer look at your database, right in the terminal. Browse tables and
+        views, filter rows, and inspect JSON with a keyboard-driven, read-only interface.
       </p>
-      <pre class="hero-terminal"><code># From a checkout (Rust 1.88+ and a C compiler)
-cargo install --path . --locked
-sqlens path/to/database.sqlite</code></pre>
+      <pre class="hero-terminal" tabindex="0" aria-label="Run SQLens"><code>sqlens path/to/database.sqlite</code></pre>
       <div class="actions">
-        <a class="button primary" href="https://github.com/torpedro/sqlens">View source</a>
+        <a class="button primary" href="#install">Get started</a>
+        <a class="button" href="https://github.com/torpedro/sqlens">View source</a>
       </div>
     </div>
     <figure class="terminal-shot">
-      <img src="assets/screenshot-1.png" alt="Original SQLens prototype showing the SQLite browser layout">
-      <figcaption>Original prototype layout. SQLens is now implemented in Rust with Ratatui.</figcaption>
+      <a href="assets/screenshot-1.png" aria-label="View the SQLens screenshot at full size">
+        <img src="assets/screenshot-1.png" alt="SQLens browsing eight demo products, with the table list, schema, selected row detail, and generated SQL visible.">
+      </a>
+      <figcaption>The products table in the demo database. Select the screenshot to view it at full size.</figcaption>
     </figure>
-  </div>
+  </header>
+
+  <section id="install" aria-labelledby="install-title">
+    <h2 id="install-title">Install and open a database</h2>
+    <p>You’ll need Rust 1.88 or newer, Cargo, Git, and a C compiler to build from source.
+      SQLite is bundled into the executable. The installed app needs neither Python nor a separate SQLite installation.</p>
+    <pre tabindex="0" aria-label="Installation commands"><code>git clone https://github.com/torpedro/sqlens.git
+cd sqlens
+cargo install --path . --locked
+sqlens path/to/database.sqlite</code></pre>
+    <p class="note">Use the path to an existing database file. If your shell cannot find <code>sqlens</code>,
+      add Cargo’s installation bin directory to your PATH, following the message printed by <code>cargo install</code>.</p>
+    <h3>Run from the checkout</h3>
+    <pre tabindex="0" aria-label="Run from source"><code>cargo run --locked --release -- path/to/database.sqlite</code></pre>
+    <p class="note"><code>--locked</code> uses the dependency versions in <code>Cargo.lock</code> without updating it.
+      <code>--release</code> builds an optimized executable. The final <code>--</code> separates Cargo’s options from the database path.</p>
+  </section>
+
+  <section id="browse" aria-labelledby="browse-title">
+    <h2 id="browse-title">Find your way around</h2>
+    <div class="columns">
+      <div>
+        <ol class="steps">
+          <li>Choose a table or view in the left pane with <kbd>↑</kbd> and <kbd>↓</kbd>.</li>
+          <li>Press <kbd>Enter</kbd> to focus the grid. Use the arrows to select a cell.</li>
+          <li>Press <kbd>f</kbd> to filter its column, or <kbd>s</kbd> to sort it.</li>
+          <li>Press <kbd>Enter</kbd> again for full cell detail. <kbd>Esc</kbd> takes you back.</li>
+        </ol>
+      </div>
+      <div>
+        <p>The right pane shows the schema, a page of 50 rows, selected row detail, and the generated SQL.
+          You can also click tables, cells, and column headers, or navigate with the mouse wheel.</p>
+        <p class="muted">Queries run in the background. You can select another table while one is loading,
+          or press <kbd>Esc</kbd> from the grid to cancel. Use a terminal at least 40 columns wide and 12 rows high;
+          larger windows show more schema and row detail.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="shortcuts" aria-labelledby="shortcuts-title">
+    <h2 id="shortcuts-title">Keyboard reference</h2>
+    <div class="table-scroll" tabindex="0" role="region" aria-label="Keyboard shortcuts">
+      <table>
+        <caption>Grid commands apply while the grid has focus. Press <kbd>?</kbd> for help inside SQLens.</caption>
+        <thead><tr><th scope="col">Key</th><th scope="col">Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Tab</kbd></td><td>Switch between the table list and grid.</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></td><td>Navigate tables, rows, and columns.</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Focus the grid or open full cell detail.</td></tr>
+          <tr><td><kbd>s</kbd> / <kbd>S</kbd></td><td>Sort ascending / descending. Repeat the same key to clear that sort.</td></tr>
+          <tr><td><kbd>f</kbd></td><td>Edit the selected column’s LIKE filter.</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Clear all filters and sorting.</td></tr>
+          <tr><td><kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd></td><td>Toggle visibility of base columns 1–10.</td></tr>
+          <tr><td><kbd>v</kbd></td><td>Open the selector for all base columns. Use arrows and <kbd>Space</kbd> to toggle visibility.</td></tr>
+          <tr><td><kbd>+</kbd></td><td>Add a SQL SELECT expression as a column.</td></tr>
+          <tr><td><kbd>Delete</kbd></td><td>Remove the selected expression column, including its filter and sort.</td></tr>
+          <tr><td><kbd>c</kbd></td><td>Copy the raw selected value through the terminal clipboard.</td></tr>
+          <tr><td><kbd>PgDn</kbd> / <kbd>PgUp</kbd></td><td>Next / previous page of 50 rows.</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last row on the current page, or first / last table.</td></tr>
+          <tr><td><kbd>r</kbd></td><td>Reload the current table’s data.</td></tr>
+          <tr><td><kbd>Esc</kbd> / <kbd>Backspace</kbd></td><td>Return from cell detail or the grid. From a loading grid, cancel the query.</td></tr>
+          <tr><td><kbd>Ctrl+Q</kbd> / <kbd>Ctrl+C</kbd></td><td>Quit from any screen, including an input or dialog.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Column indicators: <code>●</code> visible, <code>○</code> hidden,
+      <code>⊘</code> filtered, and <code>▲</code> / <code>▼</code> sorted. At least one base column stays visible.</p>
+  </section>
+
+  <section id="expressions" aria-labelledby="expressions-title">
+    <h2 id="expressions-title">Filter rows and add expressions</h2>
+    <div class="columns">
+      <div>
+        <h3>Filter a column</h3>
+        <p>Select a cell and press <kbd>f</kbd>. Typing <code>London</code> applies
+          <code>column LIKE '%London%'</code>. Filters on multiple columns are combined with AND.</p>
+        <p>Submit an empty input to clear that column’s filter. Spaces are preserved, and
+          <code>%</code> and <code>_</code> keep their SQLite wildcard meaning. Hiding a column keeps its filter active.</p>
+        <p class="note">Filter values are bound parameters. The SQL pane shows the generated query and its parameters.</p>
+      </div>
+      <div>
+        <h3>Add a calculated column</h3>
+        <p>Press <kbd>+</kbd> and enter one expression, optionally with an explicit <code>AS</code> alias. For example:</p>
+        <pre tabindex="0" aria-label="Example SELECT expressions"><code>UPPER(name) AS upper_name
+json_extract(data, '$.id') AS json_id
+CAST(price AS REAL) * quantity AS total</code></pre>
+        <p>You can sort and filter the result like any other column. To remove it, select that expression’s
+          column in the grid and press <kbd>Delete</kbd>.</p>
+        <p class="note">Duplicate column labels are rejected. Aggregates such as <code>COUNT(*)</code>
+          follow SQLite’s semantics and may collapse the result into one row.</p>
+      </div>
+    </div>
+    <p>In either input, <kbd>Enter</kbd> submits and <kbd>Esc</kbd> cancels. Unicode typing, paste,
+      arrow-key editing, <kbd>Home</kbd>, <kbd>End</kbd>, and <kbd>Ctrl+U</kbd> to clear are supported.</p>
+  </section>
+
+  <section id="details" aria-labelledby="details-title">
+    <h2 id="details-title">Inspect the full value</h2>
+    <p>Press <kbd>Enter</kbd> on a cell to open its detail view. JSON text is automatically formatted and
+      highlighted. Plain text is displayed literally; BLOBs are shown as hexadecimal SQL literals.</p>
+    <p>Use the arrow keys to scroll, <kbd>PgUp</kbd> / <kbd>PgDn</kbd> to scroll vertically, and
+      <kbd>Ctrl</kbd> + an arrow key to move to an adjacent cell on the current page. Press <kbd>c</kbd>
+      to copy the raw value, or <kbd>Esc</kbd> to return.</p>
+    <details>
+      <summary>Clipboard support</summary>
+      <p>Copying uses OSC 52, the terminal clipboard protocol. It can work over SSH as long as your terminal
+        permits clipboard writes. SQLens confirms that it sent the request; the protocol does not confirm
+        whether the clipboard changed. NULL values are copied as <code>NULL</code>.</p>
+    </details>
+    <details>
+      <summary>Large or changing databases</summary>
+      <p>Exact row counts and deep pages can still take time. SQLens caches counts across paging, sorting,
+        and visibility changes, and invalidates them when the query source, filters, or database data version changes.
+        Navigation and quitting stay available while the query runs.</p>
+      <p>Without an explicit sort, rows follow SQLite’s query plan. Duplicate sort values or external writes
+        can change page boundaries. Press <kbd>r</kbd> to reload rows; reopen SQLens to refresh the table list.</p>
+    </details>
+    <details>
+      <summary>Read-only access</summary>
+      <p>SQLens opens the database with SQLite’s read-only flag and enables <code>query_only</code>.
+        Filters and expressions change what you see; they do not edit the stored data.</p>
+    </details>
+  </section>
+  </main>
+  <footer class="shell">
+    <span>sqlens · Rust + Ratatui</span>
+    <a href="https://github.com/torpedro/sqlens">Source &amp; README</a>
+    <a href="https://github.com/torpedro/sqlens/issues">Report an issue</a>
+    <a href="https://github.com/torpedro/sqlens/blob/main/LICENSE">MIT license</a>
+  </footer>
 </body>
 </html>

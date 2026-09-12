@@ -7,7 +7,7 @@ description = "A read-only SQLite database explorer for the terminal"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/torpedro/sqlens"
-include = ["/src/**", "/tests/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICENSE"]
+include = ["/src/**", "/tests/**", "/examples/**", "/Cargo.toml", "/Cargo.lock", "/README.md", "/LICENSE"]
 
 [dependencies]
 anyhow = "1.0"

@@ -106,12 +106,40 @@ Without an explicit sort, row order follows SQLite's query plan. Duplicate sort
 values and databases modified by other processes can produce changing page
 boundaries. `r` refreshes rows; reopen SQLens to refresh the table list.
 
+## Demo database and screenshots
+
+Generate a repeatable database of fictional shop data from the repository root:
+
+```console
+cargo run --locked --example create_demo
+cargo run --locked --release -- demo.sqlite
+```
+
+The generator uses the readable fixture in `examples/demo.sql` and bundled SQLite;
+no separate SQLite command-line tool is needed. It creates `demo.sqlite` with
+120 customers, 8 products, 360 orders, and two views. The data includes JSON
+profiles, Unicode names, NULLs, multiline text, BLOBs, and generated order totals.
+Dates and values are fixed so screenshots can be reproduced.
+
+An existing file is never overwritten. To create another copy, supply a new path
+(its parent directory must already exist):
+
+```console
+cargo run --locked --example create_demo -- another-demo.sqlite
+```
+
+For an overview screenshot, use a terminal around 120×36, select `customers`,
+press Enter, and press `s` on `id` to sort ascending. For a JSON screenshot,
+navigate to `profile` and press Enter. Try `json_extract(profile, '$.plan') AS plan`
+as an expression, or open `orders` to see the generated `total` column.
+Generated `.sqlite` files are ignored by Git; the SQL fixture and generator are tracked.
+
 ## Development
 
 ```console
 cargo fmt --check
 cargo clippy --locked --all-targets -- -D warnings
-cargo test --locked
+cargo test --locked --all-targets
 ```
 
 - `src/main.rs`: CLI, terminal lifecycle, events, clipboard.
@@ -124,5 +152,5 @@ read-only enforcement, generated columns, expressions, filters, paging, worker
 requests, keyboard state, Unicode input, and rendering at different terminal sizes.
 
 The Python/Textual implementation was replaced in version 0.2.0 and remains
-available in Git history. The original prototype screenshot is retained in
-`docs/assets/screenshot-1.png` as a layout reference.
+available in Git history. A screenshot of the current Rust interface is available
+in `docs/assets/screenshot-1.png` and on the documentation page.
