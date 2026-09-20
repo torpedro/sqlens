@@ -6,14 +6,21 @@ add SQL expressions, and inspect full cell values with JSON highlighting.
 
 ## Install and run
 
-From this repository, with Rust 1.88+ and a C compiler installed:
+From [crates.io](https://crates.io/crates/sqlens), with Rust 1.88+ and a C compiler
+installed:
 
 ```console
-cargo install --path . --locked
+cargo install sqlens --locked
 sqlens path/to/database.sqlite
 ```
 
-Or run directly from the checkout:
+Or from a checkout of this repository:
+
+```console
+cargo install --path . --locked
+```
+
+Or run directly from the checkout without installing:
 
 ```console
 cargo run --locked --release -- path/to/database.sqlite
