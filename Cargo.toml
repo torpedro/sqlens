@@ -11,7 +11,7 @@ include = ["/src/**", "/tests/**", "/examples/**", "/Cargo.toml", "/Cargo.lock",
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.22"
+base64 = "0.23"
 clap = { version = "4.6", features = ["derive"] }
 crossterm = "0.29"
 ratatui = { version = "0.30", default-features = false, features = ["crossterm"] }
