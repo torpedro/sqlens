@@ -196,7 +196,8 @@
         A closer look at your database, right in the terminal. Browse tables and
         views, filter rows, and inspect JSON with a keyboard-driven, read-only interface.
       </p>
-      <pre class="hero-terminal" tabindex="0" aria-label="Run SQLens"><code>sqlens path/to/database.sqlite</code></pre>
+      <pre class="hero-terminal" tabindex="0" aria-label="Install and run SQLens"><code>cargo install sqlens --locked
+sqlens path/to/database.sqlite</code></pre>
       <div class="actions">
         <a class="button primary" href="#install">Get started</a>
         <a class="button" href="https://github.com/torpedro/sqlens">View source</a>
@@ -212,18 +213,20 @@
 
   <section id="install" aria-labelledby="install-title">
     <h2 id="install-title">Install and open a database</h2>
-    <p>You’ll need Rust 1.88 or newer, Cargo, Git, and a C compiler to build from source.
-      SQLite is bundled into the executable. The installed app needs neither Python nor a separate SQLite installation.</p>
-    <pre tabindex="0" aria-label="Installation commands"><code>git clone https://github.com/torpedro/sqlens.git
-cd sqlens
-cargo install --path . --locked
+    <p>Install from <a href="https://crates.io/crates/sqlens">crates.io</a> with Rust 1.88+
+      and a C compiler. SQLite is bundled into the executable; Python and a system SQLite
+      installation are not needed.</p>
+    <pre tabindex="0" aria-label="Install from crates.io"><code>cargo install sqlens --locked
 sqlens path/to/database.sqlite</code></pre>
     <p class="note">Use the path to an existing database file. If your shell cannot find <code>sqlens</code>,
       add Cargo’s installation bin directory to your PATH, following the message printed by <code>cargo install</code>.</p>
+    <h3>Install from a checkout</h3>
+    <pre tabindex="0" aria-label="Install from checkout"><code>cargo install --path . --locked</code></pre>
     <h3>Run from the checkout</h3>
     <pre tabindex="0" aria-label="Run from source"><code>cargo run --locked --release -- path/to/database.sqlite</code></pre>
     <p class="note"><code>--locked</code> uses the dependency versions in <code>Cargo.lock</code> without updating it.
-      <code>--release</code> builds an optimized executable. The final <code>--</code> separates Cargo’s options from the database path.</p>
+      <code>--release</code> builds an optimized executable. The final <code>--</code> separates Cargo’s options from the database path.
+      The binary is also available at <code>target/release/sqlens</code> after <code>cargo build --locked --release</code>.</p>
   </section>
 
   <section id="browse" aria-labelledby="browse-title">
