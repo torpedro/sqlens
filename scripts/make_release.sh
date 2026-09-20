@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Interactive release helper for sqlens.
+#
+# Shows the current version, prompts for the next one, updates every file that
+# records it, then optionally commits, verifies and publishes to crates.io, tags,
+# and pushes the tag. Every step is a prompt, and nothing is committed, pushed or
+# published without one.
+
+set -euo pipefail
+
+APP_NAME="sqlens"
+PUBLISH_WARNING="This uploads sqlens to crates.io. Published versions are permanent:
+they cannot be replaced or deleted, only yanked."
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+die() {
+    printf 'error: %s\n' "$*" >&2
+    exit 1
+}
+
+# confirm <prompt>; returns 0 for yes, 1 for no. There is no default: the answer must
+# be y, yes, n or no, in any case, and anything else asks again. A closed stdin answers
+# no, so a non-interactive run never takes a publishing or tagging step by falling
+# through.
+confirm() {
+    local prompt=$1 reply
+    while true; do
+        read -r -p "$prompt [y/n] " reply || return 1
+        case $reply in
+        [Yy] | [Yy][Ee][Ss]) return 0 ;;
+        [Nn] | [Nn][Oo]) return 1 ;;
+        esac
+        printf 'Please answer y or n.\n'
+    done
+}
+
+current_version() {
+    sed -n '/^\[package\]/,/^\[/p' Cargo.toml |
+        sed -n 's/^version = "\(.*\)"$/\1/p' | head -1
+}
+
+# bump <version> <major|minor|patch>
+bump() {
+    local core=${1%%-*} part=$2 major minor patch
+    IFS=. read -r major minor patch <<<"$core"
+    case $part in
+    major) printf '%d.0.0\n' "$((major + 1))" ;;
+    minor) printf '%d.%d.0\n' "$major" "$((minor + 1))" ;;
+    patch) printf '%d.%d.%d\n' "$major" "$minor" "$((patch + 1))" ;;
+    esac
+}
+
+git rev-parse --git-dir >/dev/null 2>&1 || die "not a git repository"
+
+current=$(current_version)
+[ -n "$current" ] || die "could not read the package version from Cargo.toml"
+
+printf '\n%s release\n\n  Current version: %s\n\n' "$APP_NAME" "$current"
+printf '  1) patch   %s\n' "$(bump "$current" patch)"
+printf '  2) minor   %s\n' "$(bump "$current" minor)"
+printf '  3) major   %s\n' "$(bump "$current" major)"
+printf '  4) custom\n  q) quit\n\n'
+
+read -r -p 'Select [1-4/q]: ' choice
+case $choice in
+1) target=$(bump "$current" patch) ;;
+2) target=$(bump "$current" minor) ;;
+3) target=$(bump "$current" major) ;;
+4) read -r -p 'Version: ' target ;;
+q | Q) exit 0 ;;
+*) die "no such option: $choice" ;;
+esac
+
+[[ $target =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] ||
+    die "not a version: $target"
+[ "$target" != "$current" ] || die "already at $target"
+
+tag="v$target"
+git rev-parse -q --verify "refs/tags/$tag" >/dev/null &&
+    die "tag $tag already exists; published tags must not move"
+
+if [ -n "$(git status --porcelain)" ]; then
+    printf '\nThe working tree has uncommitted changes:\n\n'
+    git status --short
+    printf '\n'
+    confirm 'Continue anyway?' || exit 0
+fi
+
+printf '\nSetting version %s ...\n\n' "$target"
+sed -i "0,/^version = \"$current\"$/s//version = \"$target\"/" Cargo.toml
+[ "$(current_version)" = "$target" ] || die "Cargo.toml was not updated"
+cargo check --quiet
+printf 'Cargo.toml and Cargo.lock updated.\n'
+
+changelog_heading="## $target - $(date +%F)"
+if [ -f CHANGELOG.md ] && grep -q '^## Unreleased$' CHANGELOG.md; then
+    printf '\n'
+    if confirm "Move the CHANGELOG \"Unreleased\" entries under $target?"; then
+        sed -i "0,/^## Unreleased$/s//## Unreleased\n\n$changelog_heading/" CHANGELOG.md
+        printf 'CHANGELOG.md: entries moved under %s\n' "${changelog_heading#\#\# }"
+    fi
+fi
+
+printf '\nChanged files:\n\n'
+git status --short
+printf '\n'
+
+if confirm "Commit as \"$APP_NAME $target\"?"; then
+    git add -A
+    git commit -q -m "$APP_NAME $target"
+    printf 'Committed %s\n' "$(git rev-parse --short HEAD)"
+else
+    printf 'Left uncommitted. A tag would not include these changes.\n'
+fi
+
+# Publishing needs a committed tree: cargo refuses to package uncommitted changes,
+# and a published version must correspond to a commit that exists.
+published=0
+if [ -n "$(git status --porcelain)" ]; then
+    printf '\nWorking tree is not clean, so the package cannot be verified or published.\n'
+    printf 'Commit the changes, then rerun this script or publish by hand.\n'
+else
+    printf '\nVerifying the package ...\n\n'
+    cargo publish --dry-run --locked --registry crates-io ||
+        die "packaging failed; fix it before publishing"
+
+    upstream=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null || true)
+    if [ -n "$upstream" ] && [ -n "$(git log --oneline "$upstream"..HEAD)" ]; then
+        printf '\nNote: HEAD is ahead of %s. Publishing a commit that is not pushed\n' "$upstream"
+        printf 'leaves the registry pointing at source nobody else can fetch.\n'
+        confirm 'Push it now?' && git push
+    fi
+
+    printf '\n%s\n' "$PUBLISH_WARNING"
+    if confirm "Publish $APP_NAME $target to crates.io?"; then
+        cargo publish --locked --registry crates-io
+        published=1
+        printf '\nPublished %s %s.\n' "$APP_NAME" "$target"
+    else
+        printf '\nNot published.\n'
+    fi
+fi
+
+if [ "$published" -eq 0 ]; then
+    printf '\nNothing was published, so a tag would name a release that is not on the\n'
+    printf 'registry. The documented order is publish first, then tag.\n\n'
+fi
+
+# The branch's own remote, so the tag follows the commit it names.
+remote=$(git rev-parse --abbrev-ref '@{upstream}' 2>/dev/null | cut -d/ -f1) || remote=""
+[ -n "$remote" ] || remote=origin
+
+if confirm "Create tag $tag?"; then
+    git tag -a "$tag" -m "$APP_NAME $target"
+    printf '\nCreated %s locally.\n' "$tag"
+
+    if confirm "Push $tag to $remote?"; then
+        git push "$remote" "$tag"
+        printf '\nPushed %s to %s. Do not move it: each tag should keep identifying\n' \
+            "$tag" "$remote"
+        printf 'the source that was published.\n'
+    else
+        printf '\nNot pushed.\n'
+        printf '  push:   git push %s %s\n' "$remote" "$tag"
+        printf '  undo:   git tag -d %s\n' "$tag"
+    fi
+else
+    printf '\nNo tag created. After publishing:\n'
+    printf '  git tag -a %s -m "%s %s" && git push %s %s\n' \
+        "$tag" "$APP_NAME" "$target" "$remote" "$tag"
+fi
+
+printf '\nDone.\n\n'
