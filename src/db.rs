@@ -308,8 +308,10 @@ fn load(
     let total = if cache.key == count_sql && cache.params == params && cache.version == version {
         cache.count
     } else {
-        let count: usize =
+        // rusqlite maps COUNT(*) to i64; usize is not a supported SQL type.
+        let count: i64 =
             conn.query_row(&count_sql, params_from_iter(params.iter()), |r| r.get(0))?;
+        let count = count.max(0) as usize;
         *cache = CountCache {
             key: count_sql,
             params: params.clone(),
@@ -404,7 +406,10 @@ impl Worker {
                     }
                     let check = Arc::clone(&current);
                     let id = request.id;
-                    conn.progress_handler(1000, Some(move || check.load(Ordering::Relaxed) != id));
+                    // A handler that fails to install only costs cancellation; the query
+                    // still runs to completion.
+                    let _ = conn
+                        .progress_handler(1000, Some(move || check.load(Ordering::Relaxed) != id));
                     let result = load(&conn, request.query, request.add.as_deref(), &mut cache);
                     if responses.send(Reply { id, result }).is_err() {
                         break;
