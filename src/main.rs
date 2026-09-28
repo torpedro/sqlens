@@ -52,6 +52,9 @@ fn main() -> Result<()> {
             if dirty {
                 terminal.draw(|frame| hits = ui::render(frame, &mut app))?;
                 dirty = false;
+                if let Some(rows) = hits.page_size {
+                    dirty = app.fit_page(rows)?;
+                }
             }
             if !event::poll(Duration::from_millis(30))? {
                 continue;

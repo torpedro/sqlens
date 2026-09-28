@@ -45,9 +45,9 @@ Small terminals use a compact layout; at least 40 columns × 12 rows are require
 
 | Key | Action |
 | --- | --- |
-| `Tab` | Switch between table list and grid |
-| `↑` / `↓` | Navigate tables or rows |
-| `←` / `→` | Navigate columns; Left from the first visible column returns to the table list |
+| `Tab` / `Shift+Tab` | Cycle focus forward / backward between table list and grid |
+| `↑` / `↓` or `k` / `j` | Navigate tables or rows |
+| `←` / `→` or `h` / `l` | Navigate columns; Left from the first visible column returns to the table list; Right from the list focuses the grid |
 | `Enter` | Focus the grid / open full cell detail |
 | `s` / `S` | Sort selected column ascending / descending; repeat to clear |
 | `f` | Edit selected column's LIKE filter |
@@ -56,9 +56,10 @@ Small terminals use a compact layout; at least 40 columns × 12 rows are require
 | `v` | Open a selector for all base columns; `Space` toggles visibility |
 | `+` | Add a SELECT expression |
 | `Delete` | Remove selected expression, including its filter and sort |
-| `c` | Copy the raw selected value |
-| `PgDn` / `PgUp` | Next / previous page, 50 rows per page |
-| `Home` / `End` | First / last row on the page, or first / last table |
+| `y` | Copy the raw selected value |
+| `Y` | Copy the selected row as formatted JSON (visible columns and expressions) |
+| `n` / `p` or `PgDn` / `PgUp` | Next / previous page; page size fits the grid height |
+| `Home` / `End` or `g` / `G` | First / last row on the current page, or first / last table |
 | `r` | Reload current table data |
 | `Esc` / `Backspace` | Return to table list; cancel a loading query from the grid |
 | `?` | Show keyboard help |
@@ -67,6 +68,10 @@ Small terminals use a compact layout; at least 40 columns × 12 rows are require
 Grid actions apply while the grid has focus. At least one base column remains
 visible. Generated columns are included in the schema; internal hidden columns of
 virtual tables are omitted.
+
+Vim navigation also works in the column selector (`j`/`k`, `g`/`G`) and cell
+detail (`hjkl` scrolls, `g`/`G` jumps to the top/bottom). A single `g` is enough.
+These keys remain ordinary text when typing a filter or expression.
 
 ### Filters and expressions
 
@@ -102,7 +107,16 @@ Clipboard copying uses the terminal's OSC 52 protocol, including over SSH when
 supported. Your terminal must permit clipboard writes. SQLens reports that it
 sent the copy request; the protocol does not confirm that the clipboard changed.
 
+`Y` copies a JSON object keyed by column name from either the grid or cell detail.
+Hidden columns are omitted; expression columns are included. Numbers and NULL
+become JSON numbers and `null`; text stays a string, including text containing JSON.
+BLOBs use hexadecimal SQL-literal strings, and non-finite real values use strings.
+
 ### Query behavior
+
+Each page contains as many rows as fit in the data grid, excluding its header and
+borders. Resizing the terminal adjusts the page size and keeps the selected result
+row on screen. A query already in progress finishes before the new size is applied.
 
 Counts are cached across paging, sorting, and visibility changes, and invalidated
 when the query source, filters, or SQLite data version changes. Exact counts and

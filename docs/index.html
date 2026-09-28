@@ -241,7 +241,8 @@ sqlens path/to/database.sqlite</code></pre>
         </ol>
       </div>
       <div>
-        <p>The right pane shows the schema, a page of 50 rows, selected row detail, and the generated SQL.
+        <p>The right pane shows the schema, a page sized to fit the data grid, selected row detail, and the generated SQL.
+          Resizing the terminal adjusts the page size while keeping the selected result row on screen.
           You can also click tables, cells, and column headers, or navigate with the mouse wheel.</p>
         <p class="muted">Queries run in the background. You can select another table while one is loading,
           or press <kbd>Esc</kbd> from the grid to cancel. Use a terminal at least 40 columns wide and 12 rows high;
@@ -257,8 +258,8 @@ sqlens path/to/database.sqlite</code></pre>
         <caption>Grid commands apply while the grid has focus. Press <kbd>?</kbd> for help inside SQLens.</caption>
         <thead><tr><th scope="col">Key</th><th scope="col">Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Tab</kbd></td><td>Switch between the table list and grid.</td></tr>
-          <tr><td><kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd></td><td>Navigate tables, rows, and columns. Left from the first visible column returns to the table list.</td></tr>
+          <tr><td><kbd>Tab</kbd> / <kbd>Shift+Tab</kbd></td><td>Cycle focus forward / backward between the table list and grid.</td></tr>
+          <tr><td>Arrows or <kbd>h</kbd> <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd></td><td>Navigate left, down, up, and right. Left from the first visible column returns to the table list; Right from the list focuses the grid.</td></tr>
           <tr><td><kbd>Enter</kbd></td><td>Focus the grid or open full cell detail.</td></tr>
           <tr><td><kbd>s</kbd> / <kbd>S</kbd></td><td>Sort ascending / descending. Repeat the same key to clear that sort.</td></tr>
           <tr><td><kbd>f</kbd></td><td>Edit the selected column’s LIKE filter.</td></tr>
@@ -267,9 +268,10 @@ sqlens path/to/database.sqlite</code></pre>
           <tr><td><kbd>v</kbd></td><td>Open the selector for all base columns. Use arrows and <kbd>Space</kbd> to toggle visibility.</td></tr>
           <tr><td><kbd>+</kbd></td><td>Add a SQL SELECT expression as a column.</td></tr>
           <tr><td><kbd>Delete</kbd></td><td>Remove the selected expression column, including its filter and sort.</td></tr>
-          <tr><td><kbd>c</kbd></td><td>Copy the raw selected value through the terminal clipboard.</td></tr>
-          <tr><td><kbd>PgDn</kbd> / <kbd>PgUp</kbd></td><td>Next / previous page of 50 rows.</td></tr>
-          <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>First / last row on the current page, or first / last table.</td></tr>
+          <tr><td><kbd>y</kbd></td><td>Copy the raw selected value through the terminal clipboard.</td></tr>
+          <tr><td><kbd>Y</kbd></td><td>Copy the selected row as formatted JSON, including visible columns and expressions.</td></tr>
+          <tr><td><kbd>n</kbd> / <kbd>p</kbd> or <kbd>PgDn</kbd> / <kbd>PgUp</kbd></td><td>Next / previous page, sized to fit the grid height.</td></tr>
+          <tr><td><kbd>Home</kbd> / <kbd>End</kbd> or <kbd>g</kbd> / <kbd>G</kbd></td><td>First / last row on the current page, or first / last table. Also works in the column selector. A single g is enough.</td></tr>
           <tr><td><kbd>r</kbd></td><td>Reload the current table’s data.</td></tr>
           <tr><td><kbd>Esc</kbd> / <kbd>Backspace</kbd></td><td>Return from cell detail or the grid. From a loading grid, cancel the query.</td></tr>
           <tr><td><kbd>Ctrl+Q</kbd> / <kbd>Ctrl+C</kbd></td><td>Quit from any screen, including an input or dialog.</td></tr>
@@ -304,16 +306,21 @@ CAST(price AS REAL) * quantity AS total</code></pre>
       </div>
     </div>
     <p>In either input, <kbd>Enter</kbd> submits and <kbd>Esc</kbd> cancels. Unicode typing, paste,
-      arrow-key editing, <kbd>Home</kbd>, <kbd>End</kbd>, and <kbd>Ctrl+U</kbd> to clear are supported.</p>
+      arrow-key editing, <kbd>Home</kbd>, <kbd>End</kbd>, and <kbd>Ctrl+U</kbd> to clear are supported.
+      Vim navigation letters remain ordinary text in these inputs.</p>
   </section>
 
   <section id="details" aria-labelledby="details-title">
     <h2 id="details-title">Inspect the full value</h2>
     <p>Press <kbd>Enter</kbd> on a cell to open its detail view. JSON text is automatically formatted and
       highlighted. Plain text is displayed literally; BLOBs are shown as hexadecimal SQL literals.</p>
-    <p>Use the arrow keys to scroll, <kbd>PgUp</kbd> / <kbd>PgDn</kbd> to scroll vertically, and
-      <kbd>Ctrl</kbd> + an arrow key to move to an adjacent cell on the current page. Press <kbd>c</kbd>
+    <p>Use the arrow keys or <kbd>hjkl</kbd> to scroll, <kbd>g</kbd> / <kbd>G</kbd> to jump to the top/bottom,
+      <kbd>PgUp</kbd> / <kbd>PgDn</kbd> to scroll vertically, and
+      <kbd>Ctrl</kbd> + an arrow key to move to an adjacent cell on the current page. Press <kbd>y</kbd>
       to copy the raw value, or <kbd>Esc</kbd> to return.</p>
+    <p><kbd>Y</kbd> copies the row as a JSON object from either the grid or cell detail.
+      Hidden columns are omitted. Numbers and NULL retain their JSON types; text stays a string.
+      BLOBs are represented as hexadecimal SQL-literal strings, and non-finite numbers as strings.</p>
     <details>
       <summary>Clipboard support</summary>
       <p>Copying uses OSC 52, the terminal clipboard protocol. It can work over SSH as long as your terminal

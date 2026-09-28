@@ -13,8 +13,6 @@ use std::{
 use anyhow::{Context, Result, ensure};
 use rusqlite::{Connection, OpenFlags, params_from_iter, types::ValueRef};
 
-pub const PAGE_SIZE: usize = 50;
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Column {
     pub name: String,
@@ -37,6 +35,7 @@ pub struct Query {
     pub filters: BTreeMap<String, String>,
     pub sort: Option<(String, bool)>, // true = descending
     pub page: usize,
+    pub page_size: usize,
 }
 
 impl Query {
@@ -48,6 +47,7 @@ impl Query {
             filters: BTreeMap::new(),
             sort: None,
             page: 0,
+            page_size: 1,
         }
     }
 }
@@ -320,7 +320,8 @@ fn load(
         };
         count
     };
-    query.page = query.page.min(total.saturating_sub(1) / PAGE_SIZE);
+    query.page_size = query.page_size.max(1);
+    query.page = query.page.min(total.saturating_sub(1) / query.page_size);
     let order = match &query.sort {
         Some((name, desc)) if all.contains(name) => format!(
             " ORDER BY {} {}",
@@ -330,13 +331,14 @@ fn load(
         _ => String::new(),
     };
     let sql = format!(
-        "SELECT {} FROM {source}{order} LIMIT {PAGE_SIZE} OFFSET {}",
+        "SELECT {} FROM {source}{order} LIMIT {} OFFSET {}",
         columns
             .iter()
             .map(|c| quote_ident(c))
             .collect::<Vec<_>>()
             .join(", "),
-        query.page * PAGE_SIZE
+        query.page_size,
+        query.page * query.page_size
     );
     let mut stmt = conn.prepare(&sql)?;
     ensure!(
@@ -460,13 +462,9 @@ mod tests {
 
     #[test]
     fn generated_columns_and_typed_values() {
-        let page = load(
-            &fixture(),
-            Query::new("t".into()),
-            None,
-            &mut CountCache::default(),
-        )
-        .unwrap();
+        let mut query = Query::new("t".into());
+        query.page_size = 3;
+        let page = load(&fixture(), query, None, &mut CountCache::default()).unwrap();
         assert!(page.schema[2].generated);
         assert_eq!(page.rows[0][2], Value::Integer(2));
         assert_eq!(page.rows[2][1], Value::Null);
@@ -541,15 +539,21 @@ mod tests {
     fn pagination_sort_and_clamping() {
         let conn = fixture();
         conn.execute_batch("WITH RECURSIVE n(x) AS (VALUES(4) UNION ALL SELECT x+1 FROM n WHERE x<120) INSERT INTO t(id,name) SELECT x, 'row' FROM n;").unwrap();
-        let mut q = Query::new("t".into());
-        q.sort = Some(("id".into(), true));
-        q.page = 1;
-        let p = load(&conn, q.clone(), None, &mut CountCache::default()).unwrap();
-        assert_eq!(p.rows[0][0], Value::Integer(70));
-        q.page = 999;
-        let p = load(&conn, q, None, &mut CountCache::default()).unwrap();
-        assert_eq!(p.query.page, 2);
-        assert_eq!(p.rows.len(), 20);
+        for size in [0, 1, 7, 37, 100, 200] {
+            let mut q = Query::new("t".into());
+            q.page_size = size;
+            q.sort = Some(("id".into(), true));
+            q.page = 1;
+            let p = load(&conn, q.clone(), None, &mut CountCache::default()).unwrap();
+            let size = size.max(1);
+            let offset = if size < 120 { size } else { 0 };
+            assert_eq!(p.rows[0][0], Value::Integer((120 - offset) as i64));
+            assert_eq!(p.rows.len(), size.min(120 - offset));
+            q.page = 999;
+            let p = load(&conn, q, None, &mut CountCache::default()).unwrap();
+            assert_eq!(p.query.page, 119 / size);
+            assert_eq!(p.rows.len(), 120 - (119 / size) * size);
+        }
     }
 
     #[test]

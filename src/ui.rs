@@ -10,7 +10,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{
     app::{App, Focus, InputKind},
-    db::{PAGE_SIZE, Value},
+    db::Value,
 };
 
 const ACCENT: Color = Color::Cyan;
@@ -18,6 +18,7 @@ const MUTED: Color = Color::DarkGray;
 
 #[derive(Default)]
 pub struct HitMap {
+    pub page_size: Option<usize>,
     pub tables: Rect,
     pub grid: Rect,
     pub columns: Vec<(u16, u16, usize)>,
@@ -155,6 +156,8 @@ pub fn render(frame: &mut Frame, app: &mut App) -> HitMap {
         );
         let grid_area = grid_block.inner(parts[1]);
         hits.grid = grid_area;
+        // The grid block already excludes borders; one further line is the header.
+        hits.page_size = Some(grid_area.height.saturating_sub(1).max(1) as usize);
         let available = grid_area.width.max(1);
         let widths: Vec<u16> = page
             .columns
@@ -326,14 +329,14 @@ pub fn render(frame: &mut Frame, app: &mut App) -> HitMap {
         let start = if page.total == 0 {
             0
         } else {
-            page.query.page * PAGE_SIZE + 1
+            page.query.page * page.query.page_size + 1
         };
         format!(
             "Rows {start}–{} of {} · Page {}/{} · Column {}/{} · READ ONLY",
-            page.query.page * PAGE_SIZE + page.rows.len(),
+            page.query.page * page.query.page_size + page.rows.len(),
             page.total,
             page.query.page + 1,
-            page.total.saturating_sub(1) / PAGE_SIZE + 1,
+            page.total.saturating_sub(1) / page.query.page_size + 1,
             app.col + 1,
             page.columns.len()
         )
@@ -341,9 +344,9 @@ pub fn render(frame: &mut Frame, app: &mut App) -> HitMap {
         "READ ONLY".into()
     };
     let help = if app.focus == Focus::Tables {
-        "↑↓ tables · Enter/Tab grid · ? help · Ctrl+Q quit"
+        "↑↓/jk tables · Enter/l grid · ? help · Ctrl+Q quit"
     } else {
-        "s/S sort · f filter · + expr · Del remove · v columns · c copy · PgUp/Dn · ? help"
+        "s/S sort · f filter · + expr · Del remove · v columns · y cell/Y row · n/p page · ? help"
     };
     frame.render_widget(
         Paragraph::new(vec![
@@ -416,7 +419,10 @@ pub fn render(frame: &mut Frame, app: &mut App) -> HitMap {
             app.schema_list.select(Some(index));
             frame.render_stateful_widget(
                 List::new(items)
-                    .block(block(" Columns · ↑↓ · Space toggles · Esc closes ", true))
+                    .block(block(
+                        " Columns · ↑↓/jk · g/G · Space toggles · Esc closes ",
+                        true,
+                    ))
                     .highlight_style(Style::default().bg(Color::DarkGray)),
                 popup,
                 &mut app.schema_list,
@@ -426,7 +432,7 @@ pub fn render(frame: &mut Frame, app: &mut App) -> HitMap {
     if app.help {
         let popup = centered(area, 78.min(area.width - 2), 23.min(area.height - 2));
         frame.render_widget(Clear, popup);
-        frame.render_widget(Paragraph::new("Tab                  Switch tables / grid\nArrows               Navigate tables or cells\nEnter                Focus grid / open full cell detail\ns / S                Sort ascending / descending; repeat clears\nf                    LIKE filter selected column; empty clears\nC                    Clear filters and sort\n1–9, 0               Toggle first ten base columns\nv                    Choose visibility of any base column\n+                    Add one SELECT expression (optional AS alias)\nDelete               Remove selected expression and its filter\nc                    Copy raw cell via terminal clipboard (OSC 52)\nPgDn / PgUp          Next / previous 50-row page\nr                    Reload current table data\nEsc / Backspace      Back to table list; cancel active query\n\nCell detail: arrows scroll; Ctrl+arrows change cell; c copies.\nInput: arrows/Home/End edit; Ctrl+U clears; paste supported.\nMouse: click tables/cells/headers; wheel navigates.\nCtrl+Q / Ctrl+C      Quit from any screen\n? / Esc              Close help").wrap(Wrap { trim: false }).block(block(" SQLens keyboard help ", true)), popup);
+        frame.render_widget(Paragraph::new("Tab / Shift+Tab      Cycle focus forward / backward\nArrows / hjkl        Navigate tables or cells\nHome/End / g/G       First / last item (grid: current page)\nEnter                Focus grid / open full cell detail\ns / S                Sort ascending / descending; repeat clears\nf                    LIKE filter selected column; empty clears\nC                    Clear filters and sort\n1–9, 0               Toggle first ten base columns\nv                    Choose visibility of any base column\n+                    Add one SELECT expression (optional AS alias)\nDelete               Remove selected expression and its filter\ny / Y                Copy cell / row as JSON (OSC 52)\nn/p or PgDn/PgUp     Next / previous screen-sized page\nr                    Reload current table data\nEsc / Backspace      Back to table list; cancel active query\n\nCell detail: hjkl/arrows scroll; g/G top/bottom; Ctrl+arrows change cell; y cell/Y row copies.\nInput: arrows/Home/End edit; Ctrl+U clears; paste supported.\nMouse: click tables/cells/headers; wheel navigates.\nCtrl+Q / Ctrl+C      Quit from any screen\n? / Esc              Close help").wrap(Wrap { trim: false }).block(block(" SQLens keyboard help ", true)), popup);
     }
     hits
 }
@@ -527,7 +533,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
     let title = format!(
         " {} · row {} · column {} ",
         literal(&app.column().unwrap_or_default()),
-        app.query.as_ref().map_or(0, |q| q.page * PAGE_SIZE) + app.row + 1,
+        app.query.as_ref().map_or(0, |q| q.page * q.page_size) + app.row + 1,
         app.col + 1
     );
     frame.render_widget(
@@ -537,7 +543,7 @@ fn render_detail(frame: &mut Frame, app: &mut App, area: Rect) {
         parts[0],
     );
     let footer = app.notice.as_ref().map_or(
-        "Arrows scroll · Ctrl+arrows change cell · c copy · Esc back · Ctrl+Q quit",
+        "hjkl/arrows · g/G top/bottom · Ctrl+arrows change cell · y cell/Y row · Esc back · Ctrl+Q quit",
         |(text, _)| text,
     );
     frame.render_widget(Paragraph::new(footer), parts[1]);

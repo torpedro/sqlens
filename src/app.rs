@@ -4,7 +4,7 @@ use anyhow::Result;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::widgets::{ListState, TableState};
 
-use crate::db::{PAGE_SIZE, Page, Query, Value, Worker};
+use crate::db::{Page, Query, Value, Worker};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
@@ -84,6 +84,7 @@ pub struct App {
     pub row: usize,
     pub col: usize,
     pub first_col: usize,
+    page_size: usize,
     pub input: Option<Input>,
     pub detail: bool,
     pub detail_scroll: (u16, u16),
@@ -111,6 +112,7 @@ impl App {
             row: 0,
             col: 0,
             first_col: 0,
+            page_size: 1,
             input: None,
             detail: false,
             detail_scroll: (0, 0),
@@ -153,7 +155,32 @@ impl App {
         self.col = 0;
         self.first_col = 0;
         self.grid = TableState::default();
-        self.submit(Query::new(self.tables[index].clone()), None)
+        let mut query = Query::new(self.tables[index].clone());
+        query.page_size = self.page_size;
+        self.submit(query, None)
+    }
+
+    /// Fit one page to the actual grid body, keeping the selected result row.
+    pub fn fit_page(&mut self, rows: usize) -> Result<bool> {
+        self.page_size = rows.max(1);
+        // Let pending filters/expressions finish before resizing their results.
+        if self.loading || self.error.is_some() {
+            return Ok(false);
+        }
+        let Some(page) = &self.page else {
+            return Ok(false);
+        };
+        if page.query.page_size == self.page_size {
+            return Ok(false);
+        }
+        let selected = page.query.page * page.query.page_size + self.row;
+        let mut query = page.query.clone();
+        query.page_size = self.page_size;
+        query.page = selected / self.page_size;
+        self.row = selected % self.page_size;
+        *self.grid.offset_mut() = 0;
+        self.submit(query, None)?;
+        Ok(true)
     }
 
     pub fn poll(&mut self) -> bool {
@@ -218,6 +245,29 @@ impl App {
 
     pub fn column(&self) -> Option<String> {
         self.page.as_ref()?.columns.get(self.col).cloned()
+    }
+
+    fn row_json(&self) -> Option<String> {
+        if self.loading {
+            return None;
+        }
+        let page = self.page.as_ref()?;
+        let row = page.rows.get(self.row)?;
+        let object: serde_json::Map<String, serde_json::Value> = page
+            .columns
+            .iter()
+            .zip(row)
+            .map(|(name, value)| {
+                let value = match value {
+                    Value::Null => serde_json::Value::Null,
+                    Value::Integer(n) => serde_json::Value::from(*n),
+                    Value::Real(n) if n.is_finite() => serde_json::Value::from(*n),
+                    _ => serde_json::Value::String(value.text()),
+                };
+                (name.clone(), value)
+            })
+            .collect();
+        serde_json::to_string_pretty(&object).ok()
     }
 
     pub fn move_cell(&mut self, rows: isize, cols: isize) {
@@ -318,12 +368,34 @@ impl App {
             }
             return Ok(None);
         }
+        // Navigation aliases apply outside inputs; modified shortcuts stay separate.
+        let key = if !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT | KeyModifiers::SUPER)
+        {
+            KeyEvent {
+                code: match key.code {
+                    KeyCode::Char('h') => KeyCode::Left,
+                    KeyCode::Char('j') => KeyCode::Down,
+                    KeyCode::Char('k') => KeyCode::Up,
+                    KeyCode::Char('l') => KeyCode::Right,
+                    KeyCode::Char('g') => KeyCode::Home,
+                    KeyCode::Char('G') => KeyCode::End,
+                    code => code,
+                },
+                ..key
+            }
+        } else {
+            key
+        };
         if let Some(index) = self.chooser {
             let len = self.page.as_ref().map_or(0, |p| p.schema.len());
             match key.code {
                 KeyCode::Esc | KeyCode::Char('v') => self.chooser = None,
                 KeyCode::Up => self.chooser = Some(index.saturating_sub(1)),
                 KeyCode::Down => self.chooser = Some((index + 1).min(len.saturating_sub(1))),
+                KeyCode::Home => self.chooser = Some(0),
+                KeyCode::End => self.chooser = Some(len.saturating_sub(1)),
                 KeyCode::Enter | KeyCode::Char(' ') if !self.loading => {
                     self.toggle_column(index)?
                 }
@@ -345,7 +417,9 @@ impl App {
                 KeyCode::Left => self.detail_scroll.1 = self.detail_scroll.1.saturating_sub(4),
                 KeyCode::Right => self.detail_scroll.1 = self.detail_scroll.1.saturating_add(4),
                 KeyCode::Home => self.detail_scroll = (0, 0),
-                KeyCode::Char('c') => return Ok(self.cell().map(Value::text)),
+                KeyCode::End => self.detail_scroll.0 = u16::MAX,
+                KeyCode::Char('y') => return Ok(self.cell().map(Value::text)),
+                KeyCode::Char('Y') => return Ok(self.row_json()),
                 _ => {}
             }
             return Ok(None);
@@ -354,7 +428,9 @@ impl App {
             self.help = true;
             return Ok(None);
         }
-        if key.code == KeyCode::Tab {
+        // With two focusable panes, forward and backward cycles both toggle.
+        // Crossterm reports Shift+Tab as BackTab (or Tab with SHIFT).
+        if matches!(key.code, KeyCode::Tab | KeyCode::BackTab) {
             self.focus = if self.focus == Focus::Tables {
                 Focus::Grid
             } else {
@@ -409,7 +485,8 @@ impl App {
                 self.detail = true;
                 self.detail_scroll = (0, 0);
             }
-            KeyCode::Char('c') => return Ok(self.cell().map(Value::text)),
+            KeyCode::Char('y') => return Ok(self.cell().map(Value::text)),
+            KeyCode::Char('Y') => return Ok(self.row_json()),
             KeyCode::Char('s') => self.sort(false)?,
             KeyCode::Char('S') => self.sort(true)?,
             KeyCode::Char('f') => {
@@ -441,10 +518,10 @@ impl App {
                     self.submit(q, None)?;
                 }
             }
-            KeyCode::PageDown | KeyCode::PageUp => {
+            KeyCode::PageDown | KeyCode::PageUp | KeyCode::Char('n' | 'p') => {
                 if let (Some(mut q), Some(page)) = (self.query.clone(), &self.page) {
-                    let next = if key.code == KeyCode::PageDown {
-                        (q.page + 1).min(page.total.saturating_sub(1) / PAGE_SIZE)
+                    let next = if matches!(key.code, KeyCode::PageDown | KeyCode::Char('n')) {
+                        (q.page + 1).min(page.total.saturating_sub(1) / q.page_size)
                     } else {
                         q.page.saturating_sub(1)
                     };
@@ -484,6 +561,89 @@ mod tests {
     }
     fn press(app: &mut App, code: KeyCode) {
         app.key(KeyEvent::new(code, KeyModifiers::NONE)).unwrap();
+    }
+
+    #[test]
+    fn pages_fit_grid_and_resize_preserves_selection() {
+        use ratatui::{Terminal, backend::TestBackend};
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE t(id INTEGER PRIMARY KEY); WITH RECURSIVE n(x) AS (VALUES(1) UNION ALL SELECT x+1 FROM n WHERE x<200) INSERT INTO t SELECT x FROM n;").unwrap();
+        let mut app = App::new(vec!["t".into()], Worker::new(conn).unwrap()).unwrap();
+        settle(&mut app);
+        app.focus = Focus::Grid;
+        for height in [24, 45, 100, 18, 12, 36] {
+            let selected = app.cell().cloned().unwrap();
+            let mut terminal = Terminal::new(TestBackend::new(100, height)).unwrap();
+            let mut hits = crate::ui::HitMap::default();
+            terminal
+                .draw(|f| hits = crate::ui::render(f, &mut app))
+                .unwrap();
+            let capacity = hits.page_size.unwrap();
+            assert_eq!(capacity, hits.grid.height.saturating_sub(1).max(1) as usize);
+            app.fit_page(capacity).unwrap();
+            settle(&mut app);
+            assert_eq!(app.cell(), Some(&selected));
+            assert_eq!(app.page.as_ref().unwrap().rows.len(), capacity);
+            assert!(!app.fit_page(capacity).unwrap());
+            let q = app.query.as_ref().unwrap();
+            let expected_first = ((q.page + 1) * capacity + 1) as i64;
+            press(&mut app, KeyCode::PageDown);
+            settle(&mut app);
+            assert_eq!(app.cell(), Some(&Value::Integer(expected_first)));
+            press(&mut app, KeyCode::PageUp);
+            settle(&mut app);
+            app.move_cell(2, 0);
+        }
+    }
+
+    #[test]
+    fn resize_waits_for_pending_expression() {
+        let mut app = fixture();
+        app.focus = Focus::Grid;
+        press(&mut app, KeyCode::Char('+'));
+        app.input.as_mut().unwrap().insert("id + 1 AS next_id");
+        press(&mut app, KeyCode::Enter);
+        assert!(!app.fit_page(8).unwrap());
+        settle(&mut app);
+        assert!(app.fit_page(8).unwrap());
+        settle(&mut app);
+        assert_eq!(app.query.as_ref().unwrap().page_size, 8);
+        assert_eq!(app.query.as_ref().unwrap().expressions[0].label, "next_id");
+    }
+
+    #[test]
+    fn copy_row_json_preserves_types_and_uses_displayed_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(r#"CREATE TABLE t(id INTEGER, price REAL, note TEXT, missing TEXT, bytes BLOB, doc TEXT); INSERT INTO t VALUES(42, 1.5, 'Zoë "quoted"', NULL, X'00FF', '{"ok":true}');"#).unwrap();
+        let mut app = App::new(vec!["t".into()], Worker::new(conn).unwrap()).unwrap();
+        settle(&mut app);
+        app.focus = Focus::Grid;
+        let copy = KeyEvent::new(KeyCode::Char('Y'), KeyModifiers::SHIFT);
+        let json = app.key(copy).unwrap().unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({"id":42, "price":1.5, "note":"Zoë \"quoted\"", "missing":null, "bytes":"X'00FF'", "doc":"{\"ok\":true}"})
+        );
+        app.detail = true;
+        assert_eq!(app.key(copy).unwrap(), Some(json));
+        app.detail = false;
+        app.toggle_column(0).unwrap();
+        settle(&mut app);
+        let q = app.query.clone().unwrap();
+        app.submit(q, Some("price * 2 AS doubled".into())).unwrap();
+        assert!(app.key(copy).unwrap().is_none());
+        settle(&mut app);
+        let value: serde_json::Value =
+            serde_json::from_str(&app.key(copy).unwrap().unwrap()).unwrap();
+        assert!(value.get("id").is_none());
+        assert_eq!(value["doubled"], 3.0);
+        press(&mut app, KeyCode::Char('f'));
+        assert!(app.key(copy).unwrap().is_none());
+        assert_eq!(app.input.as_ref().unwrap().text, "Y");
+        app.input = None;
+        app.page.as_mut().unwrap().rows.clear();
+        assert!(app.key(copy).unwrap().is_none());
     }
 
     #[test]
@@ -565,7 +725,7 @@ mod tests {
         app.focus = Focus::Grid;
         app.col = 1;
         assert_eq!(
-            app.key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::NONE))
+            app.key(KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE))
                 .unwrap(),
             Some("[bold]literal[/bold]".into())
         );
