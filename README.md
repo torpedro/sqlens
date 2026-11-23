@@ -6,7 +6,7 @@ add SQL expressions, and inspect full cell values with JSON highlighting.
 
 ## Install and run
 
-From [crates.io](https://crates.io/crates/sqlens), with Rust 1.88+ and a C compiler
+From [crates.io](https://crates.io/crates/sqlens), with Rust 1.89+ and a C compiler
 installed:
 
 ```console

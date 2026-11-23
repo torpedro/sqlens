@@ -389,7 +389,7 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn new(conn: Connection) -> Result<Self> {
+    pub fn new(mut conn: Connection) -> Result<Self> {
         let (tx, requests) = mpsc::channel::<Request>();
         let (responses, rx) = mpsc::channel();
         let generation = Arc::new(AtomicU64::new(0));
